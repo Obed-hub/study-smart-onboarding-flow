@@ -9,7 +9,87 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          id: string
+          is_premium: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          id: string
+          is_premium?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          is_premium?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      study_sessions: {
+        Row: {
+          created_at: string | null
+          id: string
+          input_type: string | null
+          original_input: string | null
+          questions: Json | null
+          source: string | null
+          title: string | null
+          topics: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          input_type?: string | null
+          original_input?: string | null
+          questions?: Json | null
+          source?: string | null
+          title?: string | null
+          topics?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          input_type?: string | null
+          original_input?: string | null
+          questions?: Json | null
+          source?: string | null
+          title?: string | null
+          topics?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_usage: {
+        Row: {
+          id: string
+          last_reset_date: string | null
+          questions_generated: number | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          last_reset_date?: string | null
+          questions_generated?: number | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          last_reset_date?: string | null
+          questions_generated?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
