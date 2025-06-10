@@ -1,16 +1,18 @@
-
 import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, FileText, CheckCircle, X } from 'lucide-react';
+import { Upload, FileText, CheckCircle, X, Type } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const StepOne = ({ onNext }) => {
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [textContent, setTextContent] = useState('');
+  const [inputMethod, setInputMethod] = useState('file'); // 'file' or 'text'
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
   const [gradeLevel, setGradeLevel] = useState('');
@@ -68,6 +70,7 @@ const StepOne = ({ onNext }) => {
       }
 
       setUploadedFile(file);
+      setTextContent(''); // Clear text if file is uploaded
       toast({
         title: "File uploaded successfully",
         description: `${file.name} has been uploaded.`,
@@ -80,10 +83,10 @@ const StepOne = ({ onNext }) => {
   };
 
   const handleNext = () => {
-    if (!uploadedFile || !title || !subject || !gradeLevel) {
+    if ((!uploadedFile && !textContent.trim()) || !title || !subject || !gradeLevel) {
       toast({
         title: "Missing information",
-        description: "Please fill in all fields and upload a file.",
+        description: "Please fill in all fields and either upload a file or enter text content.",
         variant: "destructive",
       });
       return;
@@ -91,6 +94,7 @@ const StepOne = ({ onNext }) => {
 
     onNext({
       file: uploadedFile,
+      textContent: textContent.trim(),
       title,
       subject,
       gradeLevel
@@ -110,59 +114,115 @@ const StepOne = ({ onNext }) => {
         <CardHeader>
           <CardTitle className="flex items-center">
             <Upload className="w-5 h-5 mr-2 text-blue-600" />
-            File Upload
+            Study Material Input
           </CardTitle>
           <CardDescription>
-            Supported formats: PDF, Word documents, and text files (max 10MB)
+            Choose to upload a file or paste your content directly
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {!uploadedFile ? (
-            <div
-              className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+        <CardContent className="space-y-4">
+          {/* Input Method Toggle */}
+          <div className="flex space-x-2 bg-gray-100 p-1 rounded-lg">
+            <button
+              type="button"
+              onClick={() => {
+                setInputMethod('file');
+                setTextContent('');
+              }}
+              className={`flex-1 flex items-center justify-center py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                inputMethod === 'file'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
               }`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
             >
-              <input
-                type="file"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={handleChange}
-                accept=".pdf,.doc,.docx,.txt"
-              />
-              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-lg font-medium text-gray-700 mb-2">
-                Drop your file here, or click to browse
-              </p>
-              <p className="text-sm text-gray-500">
-                PDF, DOC, DOCX, or TXT files up to 10MB
-              </p>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center">
-                <FileText className="w-8 h-8 text-green-600 mr-3" />
-                <div>
-                  <p className="font-medium text-green-800">{uploadedFile.name}</p>
-                  <p className="text-sm text-green-600">
-                    {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+              <Upload className="w-4 h-4 mr-2" />
+              Upload File
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setInputMethod('text');
+                setUploadedFile(null);
+              }}
+              className={`flex-1 flex items-center justify-center py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                inputMethod === 'text'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Type className="w-4 h-4 mr-2" />
+              Enter Text
+            </button>
+          </div>
+
+          {/* File Upload Section */}
+          {inputMethod === 'file' && (
+            <>
+              {!uploadedFile ? (
+                <div
+                  className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                    dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                >
+                  <input
+                    type="file"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={handleChange}
+                    accept=".pdf,.doc,.docx,.txt"
+                  />
+                  <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-lg font-medium text-gray-700 mb-2">
+                    Drop your file here, or click to browse
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    PDF, DOC, DOCX, or TXT files up to 10MB
                   </p>
                 </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={removeFile}
-                  className="text-red-600 hover:text-red-800"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
+              ) : (
+                <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center">
+                    <FileText className="w-8 h-8 text-green-600 mr-3" />
+                    <div>
+                      <p className="font-medium text-green-800">{uploadedFile.name}</p>
+                      <p className="text-sm text-green-600">
+                        {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={removeFile}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Text Input Section */}
+          {inputMethod === 'text' && (
+            <div className="space-y-2">
+              <Label htmlFor="content">Study Material Content</Label>
+              <Textarea
+                id="content"
+                placeholder="Paste your syllabus, course outline, or study material here..."
+                value={textContent}
+                onChange={(e) => setTextContent(e.target.value)}
+                className="min-h-[200px] resize-y"
+              />
+              <p className="text-sm text-gray-500">
+                {textContent.length} characters
+              </p>
             </div>
           )}
         </CardContent>
