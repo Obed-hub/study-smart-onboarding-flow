@@ -2,4 +2,4 @@
 project_id = "pqgekoejxcuadxvynkvv"
 
 [functions.ai-study-assistant]
-verify_jwt = true
+verify_jwt = false
