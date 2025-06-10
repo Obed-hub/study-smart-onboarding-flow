@@ -112,8 +112,9 @@ Please structure your response like this:
 Focus on concepts that would be important for exams and understanding.`;
 
   try {
+    // Updated endpoint to use the latest Gemini API version and model
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.0-pro:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {
@@ -265,8 +266,9 @@ Format each question like this:
 Make the questions educational and test understanding, not just memorization.`;
 
   try {
+    // Updated endpoint to use the latest Gemini API version and model
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.0-pro:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {

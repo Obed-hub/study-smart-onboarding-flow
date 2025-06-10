@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Brain, BookOpen, Clock, CheckCircle, Sparkles, AlertCircle } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 const StepTwo = ({ fileData, onNext }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(true);
@@ -23,11 +22,15 @@ const StepTwo = ({ fileData, onNext }) => {
 
         console.log('Starting AI analysis for:', fileData);
 
+        // Prepare input content - if there's textContent, use that, otherwise use the subject
+        const inputContent = fileData.textContent || fileData.subject;
+        const inputType = fileData.textContent ? 'text' : 'topic';
+
         const response = await supabase.functions.invoke('ai-study-assistant', {
           body: {
             action: 'analyze',
-            input: fileData.content || fileData.subject,
-            inputType: fileData.inputType || 'text'
+            input: inputContent,
+            inputType: inputType
           }
         });
 
