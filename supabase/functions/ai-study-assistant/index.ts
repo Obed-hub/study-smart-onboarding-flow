@@ -112,9 +112,9 @@ Please structure your response like this:
 Focus on concepts that would be important for exams and understanding.`;
 
   try {
-    // Updated endpoint to use the latest Gemini API version and model
+    // Updated endpoint to use a newer Gemini model and correct API version
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.0-pro:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {
@@ -146,6 +146,10 @@ Focus on concepts that would be important for exams and understanding.`;
     console.log('Gemini response received:', data);
     
     if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+      // Handle cases where the API returns a successful status but no content
+      if (data.promptFeedback && data.promptFeedback.blockReason) {
+        throw new Error(`Content blocked by Gemini API: ${data.promptFeedback.blockReason}`);
+      }
       throw new Error('Invalid response format from Gemini API');
     }
     
@@ -266,9 +270,9 @@ Format each question like this:
 Make the questions educational and test understanding, not just memorization.`;
 
   try {
-    // Updated endpoint to use the latest Gemini API version and model
+    // Updated endpoint to use a newer Gemini model and correct API version
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.0-pro:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {
@@ -297,6 +301,14 @@ Make the questions educational and test understanding, not just memorization.`;
     }
 
     const data = await response.json();
+    
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+      if (data.promptFeedback && data.promptFeedback.blockReason) {
+        throw new Error(`Content blocked by Gemini API: ${data.promptFeedback.blockReason}`);
+      }
+      throw new Error('Invalid response format from Gemini API');
+    }
+    
     const questionsText = data.candidates[0].content.parts[0].text;
     
     // Parse questions into structured format
