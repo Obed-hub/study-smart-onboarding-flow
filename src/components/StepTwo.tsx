@@ -12,31 +12,31 @@ const StepTwo = ({ fileData, onNext }) => {
   const [topics, setTopics] = useState<any[]>([]);
   const [analysisDone, setAnalysisDone] = useState(false);
 
-  const handleSuccess = (res) => {
-    setTopics(res.topics);
-    setAnalysisDone(true);
-    toast({
-      title: "Analysis Complete!",
-      description: `Extracted ${res.totalTopics} topics with ${res.totalSubtopics} key concepts.`
-    });
-  };
-
-  const handleError = (msg) => {
-    setAnalysisDone(false);
-    toast({
-      title: "Analysis Failed",
-      description: msg,
-      variant: "destructive"
-    });
-  };
-
-  // MAKE SURE HOOK IS CALLED BEFORE USAGE OF isLoading or error
+  // MOVE THE HOOK AND VARIABLE DESTRUCTURING TO THE TOP
   const { isLoading, error, result } = useAnalyzeContent({
     fileData,
     onSuccess: handleSuccess,
     onError: handleError,
     enabled: !analysisDone && !!fileData && !error && !isLoading && !topics.length,
   });
+
+  function handleSuccess(res) {
+    setTopics(res.topics);
+    setAnalysisDone(true);
+    toast({
+      title: "Analysis Complete!",
+      description: `Extracted ${res.totalTopics} topics with ${res.totalSubtopics} key concepts.`
+    });
+  }
+
+  function handleError(msg) {
+    setAnalysisDone(false);
+    toast({
+      title: "Analysis Failed",
+      description: msg,
+      variant: "destructive"
+    });
+  }
 
   // Retry triggers useEffect in useAnalyzeContent via key
   const handleRetry = () => {
