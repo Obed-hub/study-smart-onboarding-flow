@@ -20,6 +20,7 @@ const StepTwo = ({ fileData, onNext }) => {
       description: `Extracted ${res.totalTopics} topics with ${res.totalSubtopics} key concepts.`
     });
   };
+
   const handleError = (msg) => {
     setAnalysisDone(false);
     toast({
@@ -29,6 +30,7 @@ const StepTwo = ({ fileData, onNext }) => {
     });
   };
 
+  // MAKE SURE HOOK IS CALLED BEFORE USAGE OF isLoading or error
   const { isLoading, error, result } = useAnalyzeContent({
     fileData,
     onSuccess: handleSuccess,
@@ -43,6 +45,7 @@ const StepTwo = ({ fileData, onNext }) => {
     setRetryToken((t) => t + 1);
   };
 
+  // Render conditionals using isLoading and error ONLY AFTER their declaration
   if (error) {
     return <AnalysisError error={error} onRetry={handleRetry} />;
   }
