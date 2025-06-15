@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      paystack_events: {
+        Row: {
+          event_type: string
+          id: string
+          processed_at: string | null
+          raw_payload: Json | null
+          reference: string
+          user_id: string
+        }
+        Insert: {
+          event_type: string
+          id?: string
+          processed_at?: string | null
+          raw_payload?: Json | null
+          reference: string
+          user_id: string
+        }
+        Update: {
+          event_type?: string
+          id?: string
+          processed_at?: string | null
+          raw_payload?: Json | null
+          reference?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null

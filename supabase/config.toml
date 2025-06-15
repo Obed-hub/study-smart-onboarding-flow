@@ -3,3 +3,6 @@ project_id = "pqgekoejxcuadxvynkvv"
 
 [functions.ai-study-assistant]
 verify_jwt = false
+
+[functions.paystack-webhook]
+verify_jwt = false
