@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +8,8 @@ import StepTwo from '@/components/StepTwo';
 import StepThree from '@/components/StepThree';
 import AuthModal from '@/components/AuthModal';
 import { supabase } from "@/integrations/supabase/client";
+import { usePremiumStatus } from "@/hooks/usePremiumStatus";
+import UpgradeToPremium from "@/components/UpgradeToPremium";
 
 const Index = () => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -16,6 +17,8 @@ const Index = () => {
   const [analysisData, setAnalysisData] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const { isPremium, loading: premiumLoading, userId } = usePremiumStatus();
 
   useEffect(() => {
     const getSession = async () => {
@@ -58,6 +61,15 @@ const Index = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
+
+  // Premium Required Overlay / Upgrade Prompt
+  const renderPremiumBlock = () => (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur">
+      <div className="max-w-md w-full mx-auto">
+        <UpgradeToPremium userId={userId || ""} />
+      </div>
+    </div>
+  );
 
   const renderLandingPage = () => (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
@@ -291,10 +303,13 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
       {renderProgressBar()}
       <div className="container mx-auto px-4 py-8">
-        {currentStep === 1 && (
+        {/* Block app behind premium barrier */}
+        {!premiumLoading && !isPremium && renderPremiumBlock()}
+
+        {currentStep === 1 && isPremium && (
           <StepOne 
             onNext={(fileData) => {
               setUploadedFile(fileData);
@@ -302,7 +317,7 @@ const Index = () => {
             }}
           />
         )}
-        {currentStep === 2 && (
+        {currentStep === 2 && isPremium && (
           <StepTwo 
             fileData={uploadedFile}
             onNext={(analysis) => {
@@ -311,7 +326,7 @@ const Index = () => {
             }}
           />
         )}
-        {currentStep === 3 && (
+        {currentStep === 3 && isPremium && (
           <StepThree 
             analysisData={analysisData}
             fileData={uploadedFile}
