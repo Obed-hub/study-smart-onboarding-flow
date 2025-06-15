@@ -22,7 +22,6 @@ const StepTwo = ({ fileData, onNext }) => {
 
   // Analyze content using AI
   useEffect(() => {
-    // Guard to prevent re-running if analysis is done, failed, or no data is present
     if (!fileData || analysisComplete || error) {
       return;
     }
@@ -33,45 +32,62 @@ const StepTwo = ({ fileData, onNext }) => {
       const analysisTimeout = 60000; // 60 seconds
 
       try {
-        console.log('StepTwo: Starting AI analysis for:', fileData);
-
+        console.log('StepTwo: Preparing for AI analysis...');
         const inputContent = fileData.textContent || fileData.subject;
         const inputType = fileData.textContent ? 'text' : 'topic';
 
-        console.log(`StepTwo: Invoking 'ai-study-assistant' with inputType: ${inputType}`);
+        console.log(`StepTwo: About to invoke 'ai-study-assistant' with:`, {
+          inputContent,
+          inputType,
+        });
 
-        // Timeout promise
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error(`Analysis timed out after ${analysisTimeout / 1000} seconds. The server might be busy. Please try again.`)), analysisTimeout)
         );
 
-        // Race Supabase call against timeout
-        const response = await Promise.race([
-          supabase.functions.invoke('ai-study-assistant', {
-            body: {
-              action: 'analyze',
-              input: inputContent,
-              inputType: inputType
-            }
-          }),
-          timeoutPromise
-        ]) as SupabaseResponse;
+        let response: SupabaseResponse | undefined = undefined;
+        let invokeError: any = null;
 
-        console.log('StepTwo: Received response from edge function:', response);
-
-        if (response.error) {
-          throw new Error(response.error.message || 'Analysis function invocation failed. Check browser and function logs.');
+        try {
+          response = (await Promise.race([
+            supabase.functions.invoke('ai-study-assistant', {
+              body: {
+                action: 'analyze',
+                input: inputContent,
+                inputType: inputType
+              }
+            }),
+            timeoutPromise
+          ])) as SupabaseResponse;
+        } catch (err) {
+          invokeError = err;
+          console.error("StepTwo: Error caught from invoke or timeoutPromise:", err);
         }
 
-        // The edge function can return an error property in its JSON body
-        if (response.data && response.data.error) {
-          throw new Error(response.data.error);
+        // Log raw results for debugging
+        console.log('StepTwo: Edge function raw response:', response);
+        console.log('StepTwo: Edge function invoke error:', invokeError);
+
+        if (invokeError) {
+          throw invokeError;
         }
-        
-        const analysisResult = response.data;
+
+        if (!response) {
+          throw new Error("No response from Supabase Edge Function.");
+        }
+
+        if ((response as any).error) {
+          throw new Error((response as any).error.message || 'Analysis function invocation failed. Check browser and function logs.');
+        }
+
+        if ((response as any).data && (response as any).data.error) {
+          throw new Error((response as any).data.error);
+        }
+
+        const analysisResult = (response as any).data;
 
         if (!analysisResult || !Array.isArray(analysisResult.topics)) {
-            throw new Error('Invalid analysis result received from the server. The response format might be incorrect.');
+          throw new Error('Invalid analysis result received from the server. The response format might be incorrect.');
         }
 
         console.log('StepTwo: Analysis successfully parsed:', analysisResult);
@@ -85,8 +101,8 @@ const StepTwo = ({ fileData, onNext }) => {
         });
 
       } catch (err: any) {
-        console.error('StepTwo: Analysis error caught:', err);
-        const errorMessage = (err instanceof Error) ? err.message : 'An unknown error occurred during analysis.';
+        console.error('StepTwo: Caught/handled error:', err);
+        const errorMessage = (err instanceof Error) ? err.message : JSON.stringify(err);
         setError(errorMessage);
 
         toast({
@@ -95,7 +111,6 @@ const StepTwo = ({ fileData, onNext }) => {
           variant: "destructive",
         });
       } finally {
-        // Always stop the loading indicator when done
         setIsAnalyzing(false);
       }
     };
