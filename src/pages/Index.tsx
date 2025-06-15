@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import StepOne from '@/components/StepOne';
 import StepTwo from '@/components/StepTwo';
 import StepThree from '@/components/StepThree';
 import AuthModal from '@/components/AuthModal';
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -15,6 +16,30 @@ const Index = () => {
   const [analysisData, setAnalysisData] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+    };
+    getSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const newIsAuthenticated = !!session;
+      setIsAuthenticated(newIsAuthenticated);
+      
+      if (_event === 'SIGNED_IN' && newIsAuthenticated) {
+        setShowAuth(false);
+        setCurrentStep(1);
+      } else if (_event === 'SIGNED_OUT') {
+        setCurrentStep(0);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const steps = [
     { icon: Upload, title: "Upload Syllabus", description: "Upload your course material" },
@@ -28,6 +53,10 @@ const Index = () => {
     } else {
       setCurrentStep(1);
     }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
   };
 
   const renderLandingPage = () => (
@@ -51,7 +80,7 @@ const Index = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
               <Button onClick={handleStartApp} size="lg" className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3">
-                Try It Free <ArrowRight className="ml-2 w-5 h-5" />
+                {isAuthenticated ? 'Go to App' : 'Try It Free'} <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
               <Button variant="outline" size="lg" className="text-lg px-8 py-3 border-2">
                 Watch Demo
@@ -192,7 +221,7 @@ const Index = () => {
             Join thousands of students who are already using AI to improve their study efficiency
           </p>
           <Button onClick={handleStartApp} size="lg" className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-3">
-            Start Your Free Trial <ArrowRight className="ml-2 w-5 h-5" />
+            {isAuthenticated ? 'Go to App' : 'Start Your Free Trial'} <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
         </div>
       </div>
@@ -204,9 +233,16 @@ const Index = () => {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-gray-900">AI Study Assistant</h2>
-          <Button variant="ghost" onClick={() => setCurrentStep(0)}>
-            Back to Home
-          </Button>
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => setCurrentStep(0)}>
+              Back to Home
+            </Button>
+            {isAuthenticated && (
+              <Button variant="outline" onClick={handleLogout}>
+                Logout
+              </Button>
+            )}
+          </div>
         </div>
         <div className="flex items-center space-x-4">
           {steps.map((step, index) => (
@@ -246,9 +282,7 @@ const Index = () => {
             isOpen={showAuth} 
             onClose={() => setShowAuth(false)}
             onAuthenticated={() => {
-              setIsAuthenticated(true);
               setShowAuth(false);
-              setCurrentStep(1);
             }}
           />
         )}

@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mail, Lock, User, BookOpen } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const AuthModal = ({ isOpen, onClose, onAuthenticated }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -19,22 +19,23 @@ const AuthModal = ({ isOpen, onClose, onAuthenticated }) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate authentication
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const { error } = await supabase.auth.signInWithPassword({
+      email: loginData.email,
+      password: loginData.password,
+    });
 
-    // For demo purposes, accept any email/password
-    if (loginData.email && loginData.password) {
+    if (error) {
+      toast({
+        title: "Login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
       toast({
         title: "Login successful!",
         description: "Welcome back to your study assistant.",
       });
       onAuthenticated();
-    } else {
-      toast({
-        title: "Login failed",
-        description: "Please check your credentials and try again.",
-        variant: "destructive",
-      });
     }
 
     setIsLoading(false);
@@ -44,22 +45,29 @@ const AuthModal = ({ isOpen, onClose, onAuthenticated }) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate authentication
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const { error } = await supabase.auth.signUp({
+      email: signupData.email,
+      password: signupData.password,
+      options: {
+        data: {
+          full_name: signupData.name,
+        },
+        emailRedirectTo: window.location.origin,
+      },
+    });
 
-    // For demo purposes, accept any valid data
-    if (signupData.name && signupData.email && signupData.password) {
-      toast({
-        title: "Account created successfully!",
-        description: "Welcome to your AI study assistant.",
-      });
-      onAuthenticated();
-    } else {
+    if (error) {
       toast({
         title: "Signup failed",
-        description: "Please fill in all fields and try again.",
+        description: error.message,
         variant: "destructive",
       });
+    } else {
+      toast({
+        title: "Account created successfully!",
+        description: "Please check your email for a verification link to log in.",
+      });
+      onAuthenticated();
     }
 
     setIsLoading(false);
@@ -79,16 +87,6 @@ const AuthModal = ({ isOpen, onClose, onAuthenticated }) => {
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Supabase Integration Notice */}
-          <Card className="bg-blue-50 border-blue-200">
-            <CardContent className="pt-4">
-              <div className="text-center text-sm text-blue-800">
-                <p className="font-medium mb-1">🔧 Integration Required</p>
-                <p>To enable full authentication, connect this project to Supabase using the green button in the top-right corner.</p>
-              </div>
-            </CardContent>
-          </Card>
-
           <Tabs defaultValue="login" className="space-y-4">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Sign In</TabsTrigger>
