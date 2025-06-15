@@ -64,7 +64,7 @@ const Index = () => {
     await supabase.auth.signOut();
   };
 
-  // Premium Required Overlay / Upgrade Prompt
+  // Premium Required Overlay / Upgrade Prompt is now ONLY shown after free trial is used up!
   const renderPremiumBlock = () => (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur">
       <div className="max-w-md w-full mx-auto">
@@ -95,18 +95,17 @@ const Index = () => {
         handleLogout={handleLogout}
       />
       <div className="container mx-auto px-4 py-8">
-        {!premiumLoading && !isPremium && renderPremiumBlock()}
-
-        {currentStep === 1 && isPremium && (
-          <StepOne 
+        {/* Remove global isPremium blocking, StepThree now handles the trial gating */}
+        {currentStep === 1 && (
+          <StepOne
             onNext={(fileData) => {
               setUploadedFile(fileData);
               setCurrentStep(2);
             }}
           />
         )}
-        {currentStep === 2 && isPremium && (
-          <StepTwo 
+        {currentStep === 2 && (
+          <StepTwo
             fileData={uploadedFile}
             onNext={(analysis) => {
               setAnalysisData(analysis);
@@ -114,8 +113,8 @@ const Index = () => {
             }}
           />
         )}
-        {currentStep === 3 && isPremium && (
-          <StepThree 
+        {currentStep === 3 && (
+          <StepThree
             analysisData={analysisData}
             fileData={uploadedFile}
           />

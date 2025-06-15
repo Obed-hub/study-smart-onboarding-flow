@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
@@ -36,16 +35,24 @@ serve(async (req) => {
     const { action, input, inputType, fileData, analysisData }: StudyRequest = await req.json();
     console.log('Processing request:', { action, inputType, hasInput: !!input });
 
-    // For now, we'll allow unauthenticated access for testing
-    // You can add authentication back later by uncommenting the lines below
+    // Get user for trial logic
+    let userId = "anonymous";
+    let userIsPremium = false;
     
-    // const {
-    //   data: { user },
-    // } = await supabaseClient.auth.getUser();
+    const { data: { user } } = await supabaseClient.auth.getUser();
 
-    // if (!user) {
-    //   throw new Error('User not authenticated');
-    // }
+    if (user) {
+      userId = user.id;
+
+      // Fetch profile to check premium
+      const { data: profile } = await supabaseClient
+        .from("profiles")
+        .select("is_premium")
+        .eq("id", userId)
+        .maybeSingle();
+
+      userIsPremium = !!profile?.is_premium;
+    }
 
     if (action === 'analyze') {
       const analysisResult = await analyzeContent(input || '', inputType || 'text');
@@ -53,8 +60,89 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } else if (action === 'generate-questions') {
-      const questionsResult = await generateQuestions(analysisData, 'anonymous', supabaseClient);
-      return new Response(JSON.stringify(questionsResult), {
+      // ---- BEGIN FREE TRIAL LOGIC ----
+      // For premium: generate full amount; for free: check usage
+      let maxQuestions = 20;
+      if (!userIsPremium) {
+        maxQuestions = 5;
+        if (userId === "anonymous") {
+          // Not logged in, just allow the free limit (stateless trial, e.g. for demo users)
+        } else {
+          // Logged-in, check user_usage
+          // Get today's date string (YYYY-MM-DD)
+          const today = new Date().toISOString().slice(0, 10);
+          // Fetch or create user_usage row
+          let { data: usage, error: usageErr } = await supabaseClient
+            .from("user_usage")
+            .select()
+            .eq("user_id", userId)
+            .maybeSingle();
+          if (usageErr) {
+            console.error('Usage row error:', usageErr);
+          }
+
+          // If new user, create usage record
+          if (!usage) {
+            const { data: insertUsage } = await supabaseClient
+              .from('user_usage')
+              .insert({ user_id: userId, last_reset_date: today, questions_generated: 0 })
+              .select()
+              .maybeSingle();
+            usage = insertUsage;
+          }
+
+          // Reset daily if necessary
+          if (usage && usage.last_reset_date !== today) {
+            // Reset usage
+            await supabaseClient
+              .from("user_usage")
+              .update({ questions_generated: 0, last_reset_date: today })
+              .eq("user_id", userId);
+            usage.questions_generated = 0;
+            usage.last_reset_date = today;
+          }
+
+          if (usage && usage.questions_generated >= maxQuestions) {
+            // Out of free trial!
+            return new Response(
+              JSON.stringify({
+                error: "Free trial limit reached. Please upgrade to premium for unlimited questions.",
+                limitReached: true,
+                questionsAllowed: maxQuestions,
+                questionsUsed: usage.questions_generated,
+              }),
+              { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+      }
+
+      const questionsResult = await generateQuestions(analysisData, userId, supabaseClient, maxQuestions);
+
+      // After generating, increment usage count for non-premium
+      if (!userIsPremium && userId !== "anonymous" && questionsResult?.questions?.length) {
+        // Type-safe
+        let add = questionsResult.questions.length;
+        // Get today's usage (again, to be sure)
+        let { data: usage } = await supabaseClient
+          .from("user_usage")
+          .select()
+          .eq("user_id", userId)
+          .maybeSingle();
+        await supabaseClient
+          .from("user_usage")
+          .update({ questions_generated: (usage?.questions_generated || 0) + add })
+          .eq("user_id", userId);
+      }
+
+      return new Response(JSON.stringify({
+        ...questionsResult,
+        limit: maxQuestions,
+        freeTrial: !userIsPremium,
+        // Propagate usage for frontend
+        questionsAllowed: maxQuestions,
+        questionsUsed: userId === 'anonymous' ? 0 : (userIsPremium ? 0 : (await getUserUsageToday(supabaseClient, userId, maxQuestions))),
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -237,7 +325,7 @@ function parseAnalysisIntoTopics(analysisText: string) {
   return topics.slice(0, 6); // Limit to 6 topics max
 }
 
-async function generateQuestions(analysisData: any, userId: string, supabaseClient: any) {
+async function generateQuestions(analysisData: any, userId: string, supabaseClient: any, maxQuestions: number = 20) {
   const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
   if (!geminiApiKey) {
     throw new Error('GEMINI_API_KEY not configured');
@@ -245,11 +333,11 @@ async function generateQuestions(analysisData: any, userId: string, supabaseClie
 
   console.log('Generating questions with Gemini AI...');
 
-  const topicsText = analysisData.topics.map((topic: any) => 
+  const topicsText = analysisData.topics.map((topic: any) =>
     `${topic.title}: ${topic.subtopics.join(', ')}`
   ).join('\n');
 
-  const prompt = `Based on these study topics, generate 15-20 exam-style questions with detailed answers:
+  const prompt = `Based on these study topics, generate ${maxQuestions} exam-style questions with detailed answers:
 
 ${topicsText}
 
@@ -312,9 +400,9 @@ Make the questions educational and test understanding, not just memorization.`;
     const questionsText = data.candidates[0].content.parts[0].text;
     
     // Parse questions into structured format
-    const questions = parseQuestionsFromText(questionsText, analysisData.topics);
+    const questions = parseQuestionsFromText(questionsText, analysisData.topics).slice(0, maxQuestions);
 
-    // Save to database (skip for unauthenticated users)
+    // Only save sessions for premium
     let sessionId = null;
     if (userId !== 'anonymous') {
       try {
@@ -344,7 +432,7 @@ Make the questions educational and test understanding, not just memorization.`;
     return {
       questions,
       sessionId,
-      totalQuestions: questions.length
+      totalQuestions: questions.length,
     };
   } catch (error) {
     console.error('Error generating questions:', error);
@@ -415,4 +503,17 @@ function parseQuestionsFromText(questionsText: string, topics: any[]) {
   }
 
   return questions.slice(0, 20); // Limit to 20 questions
+}
+
+// Utility to get current usage count for user
+async function getUserUsageToday(supabaseClient: any, userId: string, maxQuestions:number): Promise<number> {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: usage } = await supabaseClient.from("user_usage").select().eq("user_id", userId).maybeSingle();
+    if (!usage) return 0;
+    if (usage.last_reset_date !== today) return 0;
+    return usage.questions_generated || 0;
+  } catch {
+    return 0;
+  }
 }

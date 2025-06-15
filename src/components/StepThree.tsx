@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Brain, FileText, CheckCircle, AlertCircle, RefreshCw, Download, Share2 } from 'lucide-react';
+import { Brain, FileText, CheckCircle, AlertCircle, RefreshCw, Download, Share2, User } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -13,6 +12,9 @@ const StepThree = ({ analysisData, fileData }) => {
   const [questions, setQuestions] = useState([]);
   const [error, setError] = useState(null);
   const [sessionId, setSessionId] = useState(null);
+  const [freeLimit, setFreeLimit] = useState(null); // trial info
+  const [freeUsed, setFreeUsed] = useState(null);
+  const [isFree, setIsFree] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -31,7 +33,15 @@ const StepThree = ({ analysisData, fileData }) => {
         });
 
         if (response.error) {
-          throw new Error(response.error.message || 'Question generation failed');
+          if (response.error.limitReached) {
+            setFreeLimit(response.error.questionsAllowed || 5);
+            setFreeUsed(response.error.questionsUsed || freeLimit);
+            setIsFree(true);
+            setError("Trial limit reached. Please upgrade to premium for unlimited questions.");
+            setIsGenerating(false);
+            return;
+          }
+          throw new Error(response.error.message || response.error || 'Question generation failed');
         }
 
         const result = response.data;
@@ -40,6 +50,15 @@ const StepThree = ({ analysisData, fileData }) => {
         setQuestions(result.questions || []);
         setSessionId(result.sessionId);
         setIsGenerating(false);
+
+        // Free trial stats
+        if (result.freeTrial) {
+          setIsFree(true);
+          setFreeLimit(result.questionsAllowed || 5);
+          setFreeUsed(result.questionsUsed || 0);
+        } else {
+          setIsFree(false);
+        }
 
         toast({
           title: "Questions Generated!",
@@ -50,7 +69,7 @@ const StepThree = ({ analysisData, fileData }) => {
         console.error('Question generation error:', error);
         setError(error.message);
         setIsGenerating(false);
-        
+
         toast({
           title: "Generation Failed",
           description: error.message,
@@ -62,6 +81,7 @@ const StepThree = ({ analysisData, fileData }) => {
     if (analysisData && analysisData.topics) {
       generateQuestions();
     }
+    // eslint-disable-next-line
   }, [analysisData, toast]);
 
   const handleRetry = () => {
@@ -79,6 +99,45 @@ const StepThree = ({ analysisData, fileData }) => {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  // -------- TRIAL LIMIT REACHED UI --------
+  if (error && isFree && freeLimit !== null) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Free Trial Limit Reached</h1>
+          <p className="text-lg text-gray-600">
+            You have reached your daily free trial limit ({freeUsed}/{freeLimit} questions).
+          </p>
+        </div>
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="flex items-center space-x-3 mb-2">
+                <AlertCircle className="w-6 h-6 text-yellow-600" />
+                <h3 className="text-lg font-semibold text-yellow-900">Upgrade for Unlimited Access</h3>
+              </div>
+              <p className="text-yellow-800 mb-4">
+                Upgrade to premium to unlock unlimited, high-quality AI-generated study questions and enhanced features!
+              </p>
+              <Button
+                onClick={() => window.location.href = "/"}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Upgrade to Premium
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleRetry}
+              >
+                Try Again Tomorrow
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (error) {
     return (
@@ -122,7 +181,7 @@ const StepThree = ({ analysisData, fileData }) => {
             <div className="flex flex-col items-center space-y-6">
               <div className="relative">
                 <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                <Brain className="absolute inset-0 m-auto w-8 h-8 text-blue-600" />
+                <User className="absolute inset-0 m-auto w-8 h-8 text-blue-600" />
               </div>
               
               <div className="text-center space-y-4">
@@ -147,18 +206,16 @@ const StepThree = ({ analysisData, fileData }) => {
             </div>
           </CardContent>
         </Card>
-
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <h4 className="font-semibold text-blue-900 mb-2">AI-Powered Question Generation</h4>
-              <p className="text-blue-800">
-                Our AI creates questions that test your understanding at multiple levels, 
-                from basic recall to critical thinking and application.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Show free trial usage bar if relevant */}
+        {isFree && freeLimit !== null && (
+          <Card className="bg-yellow-50 border-yellow-200">
+            <CardContent className="pt-6">
+              <div className="text-center text-yellow-700">
+                Free Trial: {freeUsed}/{freeLimit} questions generated today.
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }
@@ -168,7 +225,14 @@ const StepThree = ({ analysisData, fileData }) => {
       <div className="text-center mb-8">
         <div className="flex items-center justify-center mb-4">
           <CheckCircle className="w-8 h-8 text-green-600 mr-3" />
-          <h1 className="text-3xl font-bold text-gray-900">Questions Ready!</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Questions Ready!
+            {isFree && freeLimit !== null && (
+              <span className="ml-4 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-normal">
+                Free Trial: {questions.length}/{freeLimit} today
+              </span>
+            )}
+          </h1>
         </div>
         <p className="text-lg text-gray-600">
           Generated {questions.length} practice questions based on your study material
