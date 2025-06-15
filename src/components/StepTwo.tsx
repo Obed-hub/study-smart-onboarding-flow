@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Brain, BookOpen, Clock, CheckCircle, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+
+interface SupabaseResponse {
+  data?: any;
+  error?: {
+    message: string;
+  };
+}
 
 const StepTwo = ({ fileData, onNext }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(true);
@@ -49,7 +55,7 @@ const StepTwo = ({ fileData, onNext }) => {
             }
           }),
           timeoutPromise
-        ]);
+        ]) as SupabaseResponse;
 
         console.log('StepTwo: Received response from edge function:', response);
 
