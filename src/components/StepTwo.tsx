@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Brain, BookOpen, Clock, CheckCircle, Sparkles, AlertCircle } from 'lucide-react';
+import { Brain, BookOpen, Clock, CheckCircle, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -10,39 +11,66 @@ const StepTwo = ({ fileData, onNext }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(true);
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [topics, setTopics] = useState([]);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Analyze content using AI
   useEffect(() => {
+    // Guard to prevent re-running if analysis is done, failed, or no data is present
+    if (!fileData || analysisComplete || error) {
+      return;
+    }
+
+    console.log("StepTwo: Analysis effect triggered.");
+
     const analyzeContent = async () => {
+      const analysisTimeout = 60000; // 60 seconds
+
       try {
-        setIsAnalyzing(true);
-        setError(null);
+        console.log('StepTwo: Starting AI analysis for:', fileData);
 
-        console.log('Starting AI analysis for:', fileData);
-
-        // Prepare input content - if there's textContent, use that, otherwise use the subject
         const inputContent = fileData.textContent || fileData.subject;
         const inputType = fileData.textContent ? 'text' : 'topic';
 
-        const response = await supabase.functions.invoke('ai-study-assistant', {
-          body: {
-            action: 'analyze',
-            input: inputContent,
-            inputType: inputType
-          }
-        });
+        console.log(`StepTwo: Invoking 'ai-study-assistant' with inputType: ${inputType}`);
+
+        // Timeout promise
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Analysis timed out after ${analysisTimeout / 1000} seconds. The server might be busy. Please try again.`)), analysisTimeout)
+        );
+
+        // Race Supabase call against timeout
+        const response = await Promise.race([
+          supabase.functions.invoke('ai-study-assistant', {
+            body: {
+              action: 'analyze',
+              input: inputContent,
+              inputType: inputType
+            }
+          }),
+          timeoutPromise
+        ]);
+
+        console.log('StepTwo: Received response from edge function:', response);
 
         if (response.error) {
-          throw new Error(response.error.message || 'Analysis failed');
+          throw new Error(response.error.message || 'Analysis function invocation failed. Check browser and function logs.');
         }
 
+        // The edge function can return an error property in its JSON body
+        if (response.data && response.data.error) {
+          throw new Error(response.data.error);
+        }
+        
         const analysisResult = response.data;
-        console.log('Analysis result:', analysisResult);
 
-        setTopics(analysisResult.topics || []);
-        setIsAnalyzing(false);
+        if (!analysisResult || !Array.isArray(analysisResult.topics)) {
+            throw new Error('Invalid analysis result received from the server. The response format might be incorrect.');
+        }
+
+        console.log('StepTwo: Analysis successfully parsed:', analysisResult);
+
+        setTopics(analysisResult.topics);
         setAnalysisComplete(true);
 
         toast({
@@ -50,23 +78,24 @@ const StepTwo = ({ fileData, onNext }) => {
           description: `Extracted ${analysisResult.totalTopics} topics with ${analysisResult.totalSubtopics} key concepts.`,
         });
 
-      } catch (error) {
-        console.error('Analysis error:', error);
-        setError(error.message);
-        setIsAnalyzing(false);
-        
+      } catch (err: any) {
+        console.error('StepTwo: Analysis error caught:', err);
+        const errorMessage = (err instanceof Error) ? err.message : 'An unknown error occurred during analysis.';
+        setError(errorMessage);
+
         toast({
           title: "Analysis Failed",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive",
         });
+      } finally {
+        // Always stop the loading indicator when done
+        setIsAnalyzing(false);
       }
     };
 
-    if (fileData) {
-      analyzeContent();
-    }
-  }, [fileData, toast]);
+    analyzeContent();
+  }, [fileData, toast, analysisComplete, error]); // Rerun if these change
 
   const handleGenerateQuestions = () => {
     onNext({
@@ -77,11 +106,10 @@ const StepTwo = ({ fileData, onNext }) => {
   };
 
   const handleRetry = () => {
+    console.log("StepTwo: Retrying analysis...");
     setError(null);
-    setIsAnalyzing(true);
     setAnalysisComplete(false);
-    // Re-trigger the analysis
-    window.location.reload();
+    setIsAnalyzing(true); // Re-start loading spinner and trigger useEffect
   };
 
   if (error) {
@@ -90,7 +118,7 @@ const StepTwo = ({ fileData, onNext }) => {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Analysis Failed</h1>
           <p className="text-lg text-gray-600">
-            We encountered an error while analyzing your content
+            We encountered an error while analyzing your content.
           </p>
         </div>
 
@@ -102,6 +130,7 @@ const StepTwo = ({ fileData, onNext }) => {
             </div>
             <p className="text-red-800 mb-4">{error}</p>
             <Button onClick={handleRetry} className="bg-red-600 hover:bg-red-700">
+              <RefreshCw className="w-4 h-4 mr-2" />
               Try Again
             </Button>
           </CardContent>
