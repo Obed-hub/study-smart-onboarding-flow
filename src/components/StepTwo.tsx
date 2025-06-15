@@ -12,14 +12,6 @@ const StepTwo = ({ fileData, onNext }) => {
   const [topics, setTopics] = useState<any[]>([]);
   const [analysisDone, setAnalysisDone] = useState(false);
 
-  // MOVE THE HOOK AND VARIABLE DESTRUCTURING TO THE TOP
-  const { isLoading, error, result } = useAnalyzeContent({
-    fileData,
-    onSuccess: handleSuccess,
-    onError: handleError,
-    enabled: !analysisDone && !!fileData && !error && !isLoading && !topics.length,
-  });
-
   function handleSuccess(res) {
     setTopics(res.topics);
     setAnalysisDone(true);
@@ -37,6 +29,16 @@ const StepTwo = ({ fileData, onNext }) => {
       variant: "destructive"
     });
   }
+
+  // FIX: Do not reference error/isLoading before they're declared
+  // Also, increment retryToken to force re-run if user tries again (via key)
+  const { isLoading, error, result } = useAnalyzeContent({
+    fileData,
+    onSuccess: handleSuccess,
+    onError: handleError,
+    // Only rely on state present before this point
+    enabled: !analysisDone && !!fileData && !topics.length,
+  });
 
   // Retry triggers useEffect in useAnalyzeContent via key
   const handleRetry = () => {
@@ -71,3 +73,4 @@ const StepTwo = ({ fileData, onNext }) => {
 };
 
 export default StepTwo;
+
